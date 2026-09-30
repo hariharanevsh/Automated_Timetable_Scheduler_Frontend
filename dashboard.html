@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - College Scheduler</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <h2>🏫 College Scheduler</h2>
+            <span>Admin Panel</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <a href="dashboard.html" class="active"><span class="icon">🏠</span> Dashboard</a>
+            <div class="nav-label">Manage</div>
+            <a href="teachers.html"><span class="icon">👨‍🏫</span> Teachers</a>
+            <a href="subjects.html"><span class="icon">📚</span> Subjects</a>
+            <a href="classrooms.html"><span class="icon">🚪</span> Classrooms</a>
+            <div class="nav-label">Scheduling</div>
+            <a href="timetable.html"><span class="icon">📅</span> Timetable</a>
+            <a href="staff-schedule.html"><span class="icon">🕐</span> Staff Schedule</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#" onclick="logout()">🚪 Logout</a>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+        <div class="topbar">
+            <h1>Dashboard</h1>
+            <div class="topbar-right">
+                👤 <span id="admin-name">Admin</span>
+            </div>
+        </div>
+
+        <div class="content">
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue">👨‍🏫</div>
+                    <div class="stat-info">
+                        <h3 id="count-teachers">0</h3>
+                        <p>Total Teachers</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">📚</div>
+                    <div class="stat-info">
+                        <h3 id="count-subjects">0</h3>
+                        <p>Total Subjects</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon yellow">🚪</div>
+                    <div class="stat-info">
+                        <h3 id="count-classrooms">0</h3>
+                        <p>Classrooms</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red">📅</div>
+                    <div class="stat-info">
+                        <h3 id="count-timetable">0</h3>
+                        <p>Timetable Entries</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="card">
+                <div class="card-title">Quick Actions</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+                    <a href="teachers.html" class="btn btn-secondary" style="justify-content:center;padding:14px;">
+                        👨‍🏫 Manage Teachers
+                    </a>
+                    <a href="subjects.html" class="btn btn-secondary" style="justify-content:center;padding:14px;">
+                        📚 Manage Subjects
+                    </a>
+                    <a href="classrooms.html" class="btn btn-secondary" style="justify-content:center;padding:14px;">
+                        🚪 Manage Classrooms
+                    </a>
+                    <a href="timetable.html" class="btn btn-primary" style="justify-content:center;padding:14px;">
+                        📅 Create Timetable
+                    </a>
+                    <a href="staff-schedule.html" class="btn btn-secondary" style="justify-content:center;padding:14px;">
+                        🕐 Staff Schedule
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    requireLogin();
+    document.getElementById('admin-name').textContent = sessionStorage.getItem('adminUser') || 'Admin';
+
+    async function loadStats() {
+        const [teachers, subjects, classrooms, timetable] = await Promise.all([
+            apiFetch('/teachers'),
+            apiFetch('/subjects'),
+            apiFetch('/classrooms'),
+            apiFetch('/timetable')
+        ]);
+        document.getElementById('count-teachers').textContent = teachers.length;
+        document.getElementById('count-subjects').textContent = subjects.length;
+        document.getElementById('count-classrooms').textContent = classrooms.length;
+        document.getElementById('count-timetable').textContent = timetable.length;
+    }
+
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+    }
+
+    loadStats();
+</script>
+</body>
+</html>

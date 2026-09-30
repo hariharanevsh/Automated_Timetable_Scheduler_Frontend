@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachers - College Scheduler</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <h2>🏫 College Scheduler</h2>
+            <span>Admin Panel</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <a href="dashboard.html"><span class="icon">🏠</span> Dashboard</a>
+            <div class="nav-label">Manage</div>
+            <a href="teachers.html" class="active"><span class="icon">👨‍🏫</span> Teachers</a>
+            <a href="subjects.html"><span class="icon">📚</span> Subjects</a>
+            <a href="classrooms.html"><span class="icon">🚪</span> Classrooms</a>
+            <div class="nav-label">Scheduling</div>
+            <a href="timetable.html"><span class="icon">📅</span> Timetable</a>
+            <a href="staff-schedule.html"><span class="icon">🕐</span> Staff Schedule</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#" onclick="logout()">🚪 Logout</a>
+        </div>
+    </aside>
+
+    <div class="main">
+        <div class="topbar">
+            <h1>👨‍🏫 Teachers</h1>
+            <div class="topbar-right">👤 Admin</div>
+        </div>
+
+        <div class="content">
+            <div id="alert-box" class="alert hidden"></div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <div class="card-title" style="margin:0">All Teachers</div>
+                    <button class="btn btn-primary" onclick="openModal('add-modal')">+ Add Teacher</button>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Department</th>
+                                <th>Shift</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-table">
+                            <tr><td colspan="7"><div class="empty"><div class="empty-icon">👨‍🏫</div><p>No teachers added yet.</p></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="add-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">Add Teacher</h3>
+            <button class="modal-close" onclick="closeModal('add-modal')">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="teacher-id" />
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="t-name" placeholder="e.g. Dr. Ramesh" />
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="t-email" placeholder="email@college.edu" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" id="t-phone" placeholder="9876543210" />
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input type="text" id="t-dept" placeholder="e.g. Computer Science" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Shift</label>
+                <select id="t-shift">
+                    <option value="Morning">Morning</option>
+                    <option value="Afternoon">Afternoon</option>
+                    <option value="Evening">Evening</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('add-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveTeacher()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    requireLogin();
+    let teachers = [];
+
+    async function loadTeachers() {
+        teachers = await apiFetch('/teachers');
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('teacher-table');
+        if (teachers.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">👨‍🏫</div><p>No teachers added yet.</p></div></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = teachers.map((t, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td><strong>${t.name}</strong></td>
+                <td>${t.email || '-'}</td>
+                <td>${t.phone || '-'}</td>
+                <td>${t.department || '-'}</td>
+                <td><span class="badge shift-${t.shift?.toLowerCase()}">${t.shift || 'Morning'}</span></td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="editTeacher(${t.id})">✏️ Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteTeacher(${t.id})">🗑️ Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function editTeacher(id) {
+        const t = teachers.find(x => x.id === id);
+        if (!t) return;
+        document.getElementById('modal-title').textContent = 'Edit Teacher';
+        document.getElementById('teacher-id').value = t.id;
+        document.getElementById('t-name').value = t.name;
+        document.getElementById('t-email').value = t.email || '';
+        document.getElementById('t-phone').value = t.phone || '';
+        document.getElementById('t-dept').value = t.department || '';
+        document.getElementById('t-shift').value = t.shift || 'Morning';
+        openModal('add-modal');
+    }
+
+    async function saveTeacher() {
+        const id = document.getElementById('teacher-id').value;
+        const name = document.getElementById('t-name').value.trim();
+        if (!name) { showAlert('Name is required.', 'danger'); return; }
+
+        const data = {
+            name,
+            email: document.getElementById('t-email').value.trim(),
+            phone: document.getElementById('t-phone').value.trim(),
+            department: document.getElementById('t-dept').value.trim(),
+            shift: document.getElementById('t-shift').value
+        };
+
+        if (id) {
+            await apiFetch(`/teachers/${id}`, 'PUT', data);
+            showAlert('Teacher updated successfully!');
+        } else {
+            await apiFetch('/teachers', 'POST', data);
+            showAlert('Teacher added successfully!');
+        }
+
+        closeModal('add-modal');
+        document.getElementById('teacher-id').value = '';
+        document.getElementById('modal-title').textContent = 'Add Teacher';
+        loadTeachers();
+    }
+
+    async function deleteTeacher(id) {
+        if (!confirm('Delete this teacher?')) return;
+        await apiFetch(`/teachers/${id}`, 'DELETE');
+        showAlert('Teacher deleted.', 'danger');
+        loadTeachers();
+    }
+
+    function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+
+    loadTeachers();
+</script>
+</body>
+</html>

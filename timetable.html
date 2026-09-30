@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timetable - College Scheduler</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <h2>🏫 College Scheduler</h2>
+            <span>Admin Panel</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <a href="dashboard.html"><span class="icon">🏠</span> Dashboard</a>
+            <div class="nav-label">Manage</div>
+            <a href="teachers.html"><span class="icon">👨‍🏫</span> Teachers</a>
+            <a href="subjects.html"><span class="icon">📚</span> Subjects</a>
+            <a href="classrooms.html"><span class="icon">🚪</span> Classrooms</a>
+            <div class="nav-label">Scheduling</div>
+            <a href="timetable.html" class="active"><span class="icon">📅</span> Timetable</a>
+            <a href="staff-schedule.html"><span class="icon">🕐</span> Staff Schedule</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#" onclick="logout()">🚪 Logout</a>
+        </div>
+    </aside>
+
+    <div class="main">
+        <div class="topbar">
+            <h1>📅 Timetable</h1>
+            <div class="topbar-right">
+                <button class="btn btn-success btn-sm" onclick="saveTimetable()">💾 Save Timetable</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="alert-box" class="alert hidden"></div>
+
+            <div class="card mb-2">
+                <p style="font-size:13px;color:#64748b;">
+                    💡 Click any cell in the timetable to assign a subject, teacher, and classroom for that slot.
+                </p>
+            </div>
+
+            <div class="card">
+                <div class="tt-grid">
+                    <table class="tt-table" id="tt-table">
+                        <thead id="tt-head"></thead>
+                        <tbody id="tt-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Slot Assignment Modal -->
+<div class="modal-overlay" id="slot-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="slot-modal-title">Assign Slot</h3>
+            <button class="modal-close" onclick="closeModal('slot-modal')">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Subject</label>
+                <select id="slot-subject">
+                    <option value="">-- Select Subject --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Teacher</label>
+                <select id="slot-teacher">
+                    <option value="">-- Select Teacher --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Classroom</label>
+                <select id="slot-classroom">
+                    <option value="">-- Select Classroom --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Class / Section</label>
+                <input type="text" id="slot-class" placeholder="e.g. CS-A, 2nd Year B" />
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger btn-sm" onclick="clearSlot()">🗑️ Clear Slot</button>
+            <button class="btn btn-secondary" onclick="closeModal('slot-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="assignSlot()">Assign</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    requireLogin();
+
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const PERIODS = [
+        { label: 'P1\n08:00-08:50', id: 1 },
+        { label: 'P2\n08:50-09:40', id: 2 },
+        { label: 'P3\n09:40-10:30', id: 3 },
+        { label: 'P4\n10:45-11:35', id: 4 },
+        { label: 'P5\n11:35-12:25', id: 5 },
+        { label: 'P6\n13:10-14:00', id: 6 },
+        { label: 'P7\n14:00-14:50', id: 7 }
+    ];
+
+    let timetable = {};   // key: "Monday_1" => { subject, teacher, classroom, class_name }
+    let subjects = [], teachers = [], classrooms = [];
+    let activeKey = null;
+
+    async function init() {
+        [subjects, teachers, classrooms] = await Promise.all([
+            apiFetch('/subjects'),
+            apiFetch('/teachers'),
+            apiFetch('/classrooms')
+        ]);
+
+        const saved = await apiFetch('/timetable');
+        saved.forEach(entry => {
+            timetable[entry.key] = entry;
+        });
+
+        populateDropdowns();
+        buildTable();
+    }
+
+    function populateDropdowns() {
+        const ss = document.getElementById('slot-subject');
+        const st = document.getElementById('slot-teacher');
+        const sc = document.getElementById('slot-classroom');
+
+        ss.innerHTML = '<option value="">-- Select Subject --</option>' +
+            subjects.map(s => `<option value="${s.id}">${s.name} (${s.code || s.id})</option>`).join('');
+
+        st.innerHTML = '<option value="">-- Select Teacher --</option>' +
+            teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+        sc.innerHTML = '<option value="">-- Select Classroom --</option>' +
+            classrooms.map(c => `<option value="${c.id}">${c.room_number} (${c.room_type})</option>`).join('');
+    }
+
+    function buildTable() {
+        const head = document.getElementById('tt-head');
+        const body = document.getElementById('tt-body');
+
+        // Header
+        head.innerHTML = `<tr>
+            <th style="min-width:100px">Day / Period</th>
+            ${PERIODS.map(p => `<th>${p.label.replace('\n','<br>')}</th>`).join('')}
+        </tr>`;
+
+        // Body
+        body.innerHTML = DAYS.map(day => `
+            <tr>
+                <td style="background:#f8fafc;font-weight:600;font-size:12px;padding:10px 12px;">${day}</td>
+                ${PERIODS.map(p => {
+                    const key = `${day}_${p.id}`;
+                    const slot = timetable[key];
+                    if (slot) {
+                        const subj = subjects.find(s => s.id == slot.subject_id);
+                        const tchr = teachers.find(t => t.id == slot.teacher_id);
+                        const room = classrooms.find(c => c.id == slot.classroom_id);
+                        return `<td>
+                            <div class="tt-cell filled" onclick="openSlot('${day}', ${p.id})">
+                                <div class="subject-name">${subj ? subj.name : '—'}</div>
+                                <div class="teacher-name">${tchr ? tchr.name : ''}</div>
+                                <div class="room-name">${room ? room.room_number : ''}${slot.class_name ? ' · ' + slot.class_name : ''}</div>
+                            </div>
+                        </td>`;
+                    }
+                    return `<td><div class="tt-cell" onclick="openSlot('${day}', ${p.id})"></div></td>`;
+                }).join('')}
+            </tr>
+        `).join('');
+    }
+
+    function openSlot(day, periodId) {
+        activeKey = `${day}_${periodId}`;
+        document.getElementById('slot-modal-title').textContent = `Assign: ${day} — Period ${periodId}`;
+
+        const slot = timetable[activeKey] || {};
+        document.getElementById('slot-subject').value = slot.subject_id || '';
+        document.getElementById('slot-teacher').value = slot.teacher_id || '';
+        document.getElementById('slot-classroom').value = slot.classroom_id || '';
+        document.getElementById('slot-class').value = slot.class_name || '';
+
+        openModal('slot-modal');
+    }
+
+    function assignSlot() {
+        if (!activeKey) return;
+        const subject_id = document.getElementById('slot-subject').value;
+        const teacher_id = document.getElementById('slot-teacher').value;
+        const classroom_id = document.getElementById('slot-classroom').value;
+        const class_name = document.getElementById('slot-class').value.trim();
+
+        if (!subject_id && !teacher_id) {
+            showAlert('Please select at least a subject or teacher.', 'danger');
+            return;
+        }
+
+        timetable[activeKey] = { key: activeKey, subject_id, teacher_id, classroom_id, class_name };
+        closeModal('slot-modal');
+        buildTable();
+    }
+
+    function clearSlot() {
+        if (!activeKey) return;
+        delete timetable[activeKey];
+        closeModal('slot-modal');
+        buildTable();
+    }
+
+    async function saveTimetable() {
+        const data = Object.values(timetable);
+        await apiFetch('/timetable', 'POST', data);
+        showAlert('Timetable saved successfully! ✅');
+    }
+
+    function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+
+    init();
+</script>
+</body>
+</html>
